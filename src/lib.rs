@@ -4,33 +4,33 @@
 
 pub unsafe fn hexdump(mut addr: *const u8, mut len: usize) {
     println!(
-        "@{s:#016x}..{e:#016x}",
+        "Dumping {s:#016x}..{e:#016x}",
         s = addr.addr(),
-        e = addr.addr() + len
+        e = addr.addr().wrapping_add(len)
     );
+    const PAD: &str = "";
     while len > 0 {
-        let paddr = addr.mask(!0b1111).addr();
-        let cstart = addr.addr() - paddr;
-        let clen = usize::min(16 - cstart, len);
-        let mut pbuf = [' '; 16];
-        let mut bs = [0u8; 16];
+        let base = addr.mask(!0b1111).addr();
+        let start = addr.addr() - base;
+        let clen = usize::min(16 - start, len);
 
-        let dst = (&mut bs[cstart..cstart + clen]).as_mut_ptr();
-        unsafe { core::ptr::copy(addr, dst, clen) };
-        print!("{:#x}:", paddr);
-        for _ in 0..cstart {
-            print!("   ");
+        print!("0x{base:016x}:");
+        print!("{PAD:>pad$}", pad = start * 3);
+        for k in 0..clen {
+            print!(" {:02x}", unsafe { core::ptr::read(addr.wrapping_add(k)) });
         }
-        for k in cstart..cstart + clen {
-            let b = bs[k];
-            print!(" {:02x}", bs[k]);
-            pbuf[k] = if b < 32 || b >= 127 { '.' } else { b as char };
+        print!("{PAD:>pad$}", pad = (16 - (clen + start)) * 3);
+        print!("{PAD:>start$}");
+        print!(" [");
+        for k in 0..clen {
+            let b = unsafe { core::ptr::read(addr.wrapping_add(k)) };
+            if b.is_ascii_graphic() || b == b' ' {
+                print!("{b}", b = b as char);
+            } else {
+                print!(".");
+            }
         }
-        for _ in (cstart + clen)..16 {
-            print!("   ");
-        }
-        //let s = pbuf.iter().collect::<String>();
-        println!(" [{pbuf:?}]");
+        println!("]");
         addr = addr.wrapping_add(clen);
         len -= clen;
     }
